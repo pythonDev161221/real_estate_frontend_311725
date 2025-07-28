@@ -64,6 +64,25 @@
     pointer-events: none;
 }
 
+/* Map styles */
+#main-map {
+    height: 80vh !important;
+    width: 100% !important;
+    min-height: 500px;
+    background-color: #f8f9fa;
+}
+
+#property-map {
+    height: 300px !important;
+    width: 100% !important;
+    background-color: #f8f9fa;
+}
+
+.leaflet-container {
+    height: 100% !important;
+    width: 100% !important;
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
     .hero-section h1 {
@@ -72,5 +91,9 @@
     
     .property-card {
         margin-bottom: 1rem;
+    }
+    
+    #main-map {
+        height: 60vh !important;
     }
 }

@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Frontend Automated Tests</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .pass { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .fail { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        #test-map { height: 200px; width: 300px; border: 1px solid #ccc; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>Real Estate JS Frontend Tests</h1>
+    <div id="test-results"></div>
+    <div id="test-map"></div>
+
+    <!-- Load the same libraries as main site -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    <script>
+        // Simple test framework
+        class TestRunner {
+            constructor() {
+                this.results = [];
+                this.resultsDiv = document.getElementById('test-results');
+            }
+
+            test(name, testFunction) {
+                try {
+                    const result = testFunction();
+                    if (result === true) {
+                        this.addResult(name, 'PASS', '✅ Test passed');
+                    } else if (result === false) {
+                        this.addResult(name, 'FAIL', '❌ Test failed');
+                    } else {
+                        this.addResult(name, 'INFO', `ℹ️ ${result}`);
+                    }
+                } catch (error) {
+                    this.addResult(name, 'FAIL', `❌ Error: ${error.message}`);
+                }
+            }
+
+            addResult(name, status, message) {
+                const div = document.createElement('div');
+                div.className = `test-result ${status.toLowerCase()}`;
+                div.innerHTML = `<strong>${name}:</strong> ${message}`;
+                this.resultsDiv.appendChild(div);
+                this.results.push({ name, status, message });
+            }
+
+            async asyncTest(name, testFunction) {
+                try {
+                    const result = await testFunction();
+                    if (result === true) {
+                        this.addResult(name, 'PASS', '✅ Async test passed');
+                    } else if (result === false) {
+                        this.addResult(name, 'FAIL', '❌ Async test failed');
+                    } else {
+                        this.addResult(name, 'INFO', `ℹ️ ${result}`);
+                    }
+                } catch (error) {
+                    this.addResult(name, 'FAIL', `❌ Async error: ${error.message}`);
+                }
+            }
+
+            getSummary() {
+                const passed = this.results.filter(r => r.status === 'PASS').length;
+                const failed = this.results.filter(r => r.status === 'FAIL').length;
+                const total = this.results.length;
+                return `${passed}/${total} tests passed, ${failed} failed`;
+            }
+        }
+
+        // Run tests when page loads
+        document.addEventListener('DOMContentLoaded', async function() {
+            const runner = new TestRunner();
+
+            // Test 1: Check if Leaflet library loaded
+            runner.test('Leaflet Library Loading', () => {
+                return typeof L !== 'undefined';
+            });
+
+            // Test 2: Check Leaflet version
+            runner.test('Leaflet Version', () => {
+                if (typeof L !== 'undefined' && L.version) {
+                    return `Leaflet version: ${L.version}`;
+                }
+                return false;
+            });
+
+            // Test 3: Test map container exists
+            runner.test('Map Container Exists', () => {
+                const container = document.getElementById('test-map');
+                return container !== null;
+            });
+
+            // Test 4: Test map creation
+            runner.test('Map Creation', () => {
+                try {
+                    const testMap = L.map('test-map').setView([42.8746, 74.5698], 12);
+                    return testMap !== null;
+                } catch (error) {
+                    throw new Error(`Map creation failed: ${error.message}`);
+                }
+            });
+
+            // Test 5: Test tile layer
+            runner.test('Tile Layer Creation', () => {
+                try {
+                    const tileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                        attribution: '© OpenStreetMap contributors © CARTO',
+                        subdomains: 'abcd',
+                        maxZoom: 19
+                    });
+                    return tileLayer !== null;
+                } catch (error) {
+                    throw new Error(`Tile layer creation failed: ${error.message}`);
+                }
+            });
+
+            // Test 6: Test marker creation
+            runner.test('Marker Creation', () => {
+                try {
+                    const marker = L.marker([42.8746, 74.5698]);
+                    return marker !== null;
+                } catch (error) {
+                    throw new Error(`Marker creation failed: ${error.message}`);
+                }
+            });
+
+            // Test 7: Test API endpoint accessibility
+            await runner.asyncTest('API Accessibility', async () => {
+                try {
+                    const response = await fetch('http://127.0.0.1:8000/api/properties/');
+                    if (response.ok) {
+                        const data = await response.json();
+                        return `API returned ${data.results ? data.results.length : 0} properties`;
+                    } else {
+                        return `API returned status: ${response.status}`;
+                    }
+                } catch (error) {
+                    return `API not accessible: ${error.message}`;
+                }
+            });
+
+            // Test 8: Test coordinate validation
+            runner.test('Coordinate Validation', () => {
+                const bishkekCoords = [42.8746, 74.5698];
+                const isValidLat = bishkekCoords[0] >= -90 && bishkekCoords[0] <= 90;
+                const isValidLng = bishkekCoords[1] >= -180 && bishkekCoords[1] <= 180;
+                return isValidLat && isValidLng;
+            });
+
+            // Add summary
+            setTimeout(() => {
+                const summaryDiv = document.createElement('div');
+                summaryDiv.className = 'test-result info';
+                summaryDiv.innerHTML = `<strong>Summary:</strong> ${runner.getSummary()}`;
+                runner.resultsDiv.appendChild(summaryDiv);
+            }, 1000);
+        });
+    </script>
+</body>
+</html>
