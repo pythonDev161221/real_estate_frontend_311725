@@ -27,7 +27,7 @@
                         <a class="nav-link" href="#properties" onclick="showSection('properties')">Properties</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="#map" onclick="showSection('map')">Map</a>
+                        <a class="nav-link" href="#map" onclick="showSection('map'); setTimeout(initializeSimpleMap, 200);">Map</a>
                     </li>
                 </ul>
             </div>
@@ -179,7 +179,7 @@
                                     <option value="land">Land</option>
                                 </select>
                             </div>
-                            <button type="button" class="btn btn-secondary" onclick="clearMapFilters()">Clear Filters</button>
+                            <button type="button" class="btn btn-secondary" onclick="testClearMapFilters(); loadMapProperties();">Clear Filters</button>
                         </div>
                     </div>
                 </div>
@@ -211,6 +211,61 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    
+    <script>
+    // Simple map initialization function
+    function initializeSimpleMap() {
+        console.log('Creating simple map...');
+        const mapContainer = document.getElementById('main-map');
+        if (!mapContainer) return;
+        
+        // Create map
+        const map = L.map('main-map').setView([42.8746, 74.5698], 12);
+        
+        // Add tiles
+        L.tileLayer('http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+        
+        // Load properties and add markers
+        loadPropertiesForMap(map);
+        
+        console.log('Simple map created successfully!');
+    }
+    
+    // Load properties for the map
+    async function loadPropertiesForMap(map) {
+        try {
+            const response = await fetch('http://127.0.0.1:8000/api/properties/');
+            const data = await response.json();
+            
+            data.results.forEach((property, index) => {
+                let lat = property.latitude ? parseFloat(property.latitude) : 42.8746;
+                let lng = property.longitude ? parseFloat(property.longitude) : 74.5698;
+                
+                // Add variation if all same coordinates
+                if (data.results.every(p => p.latitude === property.latitude)) {
+                    lat += (index * 0.01);
+                    lng += (index * 0.01);
+                }
+                
+                const marker = L.marker([lat, lng]).addTo(map);
+                marker.bindPopup(`
+                    <div>
+                        <h6>${property.title}</h6>
+                        <p><strong>$${Number(property.price).toLocaleString()}</strong></p>
+                        <p>${property.city}, ${property.state}</p>
+                    </div>
+                `);
+            });
+            
+            console.log('Added', data.results.length, 'property markers');
+        } catch (error) {
+            console.error('Error loading properties:', error);
+        }
+    }
+    </script>
+    
     <script src="script.js"></script>
 </body>
 </html>

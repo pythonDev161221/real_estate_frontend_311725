@@ -290,100 +290,95 @@ function getTypeDisplay(type) {
     return typeMap[type] || type;
 }
 
-// Debug function to test each step
-function debugMapCreation() {
-    console.log('=== DEBUG MAP CREATION ===');
-    console.log('1. Leaflet available?', typeof L);
-    console.log('2. Map container exists?', document.getElementById('main-map'));
-    console.log('3. Bishkek coords:', BISHKEK_COORDS);
-    
-    try {
-        const testMap = L.map('main-map').setView(BISHKEK_COORDS, 12);
-        console.log('4. Test map created:', testMap);
-        window.testMap = testMap;
-    } catch (error) {
-        console.log('4. Test map creation failed:', error);
-    }
-}
 
 // Initialize main map
 function initializeMainMap() {
-    console.log('Initializing main map...');
+    console.log('Initializing map...');
     
-    try {
-        if (!mainMap) {
-            console.log('Creating new map instance...');
+    if (!mainMap) {
+        // Wait for DOM to be ready
+        setTimeout(() => {
+            const mapContainer = document.getElementById('main-map');
+            if (!mapContainer) {
+                console.error('Map container not found');
+                return;
+            }
             
-            // Wait a bit for the DOM to be ready
-            setTimeout(() => {
-                const mapContainer = document.getElementById('main-map');
-                console.log('Map container:', mapContainer);
-                
-                if (!mapContainer) {
-                    console.error('Map container not found!');
-                    return;
-                }
-                
-                // Initialize map centered on Bishkek
-                try {
-                    mainMap = L.map('main-map').setView(BISHKEK_COORDS, 12);
-                    console.log('Map created successfully');
-                    
-                    // Add tile load/error event listeners
-                    mainMap.on('tileload', function() {
-                        console.log('✅ Tile loaded successfully!');
-                    });
-                    
-                    mainMap.on('tileerror', function(e) {
-                        console.log('❌ Tile failed to load:', e);
-                    });
-                    
-                } catch (error) {
-                    console.error('❌ Failed to create map:', error);
-                    return;
-                }
-                
-                // Try multiple tile providers
-                const tileProviders = [
-                    {
-                        url: 'http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                        options: { attribution: '© OpenStreetMap contributors' }
-                    },
-                    {
-                        url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                        options: { attribution: '© OpenStreetMap contributors' }
-                    },
-                    {
-                        url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-                        options: { attribution: '© OpenStreetMap contributors © CARTO', subdomains: 'abcd' }
-                    }
-                ];
-                
-                // Add OpenStreetMap tiles (HTTP works for local development)
-                try {
-                    L.tileLayer('http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                        attribution: '© OpenStreetMap contributors'
-                    }).addTo(mainMap);
-                    console.log('Tiles added to map');
-                    
-                    // Make mainMap globally accessible for debugging
-                    window.debugMap = mainMap;
-                    console.log('Map available as window.debugMap for testing');
-                    
-                } catch (error) {
-                    console.error('❌ Failed to add tiles:', error);
-                }
-                
-                // Load properties and add markers
-                loadMapProperties();
-            }, 100);
-        } else {
-            console.log('Map already exists, just loading properties');
-            // Load properties and add markers
+            console.log('Creating map...');
+            
+            // Start with default Bishkek center
+            mainMap = L.map('main-map').setView(BISHKEK_COORDS, 12);
+            
+            // Add OpenStreetMap tiles
+            L.tileLayer('http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(mainMap);
+            
+            console.log('Map created, loading properties...');
+            
+            // Load properties and add markers (this will auto-center)
             loadMapProperties();
+        }, 100);
+    } else {
+        console.log('Map exists, just loading properties...');
+        // Load properties and add markers
+        loadMapProperties();
+    }
+}
+
+// Determine map center based on properties
+async function getMapCenter() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/properties/`);
+        const data = await response.json();
+        
+        if (data.results && data.results.length > 0) {
+            // Get all valid coordinates
+            const validCoords = data.results
+                .filter(p => p.latitude && p.longitude)
+                .map(p => ({
+                    lat: parseFloat(p.latitude),
+                    lng: parseFloat(p.longitude)
+                }));
+            
+            if (validCoords.length > 0) {
+                // Calculate center of all properties
+                const avgLat = validCoords.reduce((sum, coord) => sum + coord.lat, 0) / validCoords.length;
+                const avgLng = validCoords.reduce((sum, coord) => sum + coord.lng, 0) / validCoords.length;
+                
+                // Determine zoom level based on spread of properties
+                const latRange = Math.max(...validCoords.map(c => c.lat)) - Math.min(...validCoords.map(c => c.lat));
+                const lngRange = Math.max(...validCoords.map(c => c.lng)) - Math.min(...validCoords.map(c => c.lng));
+                const maxRange = Math.max(latRange, lngRange);
+                
+                let zoom = 12; // default
+                if (maxRange > 0.1) zoom = 10;      // Large spread
+                else if (maxRange > 0.05) zoom = 11; // Medium spread  
+                else if (maxRange > 0.01) zoom = 13; // Small spread
+                else zoom = 14;                      // Very close together
+                
+                return {
+                    coords: [avgLat, avgLng],
+                    zoom: zoom,
+                    source: 'properties'
+                };
+            }
         }
+        
+        // Fallback to Bishkek if no properties with coordinates
+        return {
+            coords: BISHKEK_COORDS,
+            zoom: 12,
+            source: 'default'
+        };
+        
     } catch (error) {
-        console.error('Error initializing map:', error);
+        console.error('Error determining map center:', error);
+        return {
+            coords: BISHKEK_COORDS,
+            zoom: 12,
+            source: 'error'
+        };
     }
 }
 
@@ -407,10 +402,16 @@ async function loadMapProperties() {
         mapMarkers.forEach(marker => mainMap.removeLayer(marker));
         mapMarkers = [];
         
-        // Add markers for each property
-        data.results.forEach(property => {
-            const lat = property.latitude ? parseFloat(property.latitude) : BISHKEK_COORDS[0];
-            const lng = property.longitude ? parseFloat(property.longitude) : BISHKEK_COORDS[1];
+        // Add markers for each property with some variation if coordinates are the same
+        data.results.forEach((property, index) => {
+            let lat = property.latitude ? parseFloat(property.latitude) : BISHKEK_COORDS[0];
+            let lng = property.longitude ? parseFloat(property.longitude) : BISHKEK_COORDS[1];
+            
+            // Add small variation if all properties have same coordinates
+            if (data.results.every(p => p.latitude === property.latitude)) {
+                lat += (index * 0.01); // Add ~1km offset for each property
+                lng += (index * 0.01);
+            }
             
             // Create marker with different colors based on status
             const markerColor = getMarkerColor(property.status);
@@ -435,6 +436,9 @@ async function loadMapProperties() {
         if (mapMarkers.length > 0) {
             const group = new L.featureGroup(mapMarkers);
             mainMap.fitBounds(group.getBounds().pad(0.1));
+            console.log('Map centered on', mapMarkers.length, 'properties');
+        } else {
+            console.log('No markers to display');
         }
         
     } catch (error) {
@@ -455,7 +459,18 @@ function getMarkerColor(status) {
 
 // Clear map filters
 function clearMapFilters() {
+    try {
+        document.getElementById('map-status-filter').value = '';
+        document.getElementById('map-type-filter').value = '';
+        loadMapProperties();
+    } catch (error) {
+        console.error('Error clearing map filters:', error);
+    }
+}
+
+// Test function for clearing map filters
+function testClearMapFilters() {
+    console.log('Clear filters test works');
     document.getElementById('map-status-filter').value = '';
     document.getElementById('map-type-filter').value = '';
-    loadMapProperties();
 }
