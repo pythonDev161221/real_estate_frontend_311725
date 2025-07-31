@@ -103,7 +103,7 @@ function displayProperties(properties) {
     
     propertiesGrid.innerHTML = properties.map(property => `
         <div class="col-md-4 mb-4">
-            <div class="card property-card h-100" onclick="showPropertyDetail(${property.id})">
+            <div class="card property-card h-100" onclick="showPropertyDetail('${property.id}')">
                 ${property.image 
                     ? `<img src="${property.image}" class="card-img-top property-image" alt="${property.title}">`
                     : `<div class="property-placeholder"><i class="fas fa-home fa-3x"></i></div>`
@@ -425,7 +425,7 @@ async function loadMapProperties() {
                     <p class="mb-1">${getStatusDisplay(property.status)} | ${getTypeDisplay(property.property_type)}</p>
                     <p class="mb-1"><i class="fas fa-bed"></i> ${property.bedrooms} beds | <i class="fas fa-bath"></i> ${property.bathrooms} baths</p>
                     <p class="mb-2"><i class="fas fa-map-marker-alt"></i> ${property.city}, ${property.state}</p>
-                    <button class="btn btn-primary btn-sm" onclick="showPropertyDetail(${property.id})">View Details</button>
+                    <button class="btn btn-primary btn-sm" onclick="showPropertyDetail('${property.id}')">View Details</button>
                 </div>
             `);
             

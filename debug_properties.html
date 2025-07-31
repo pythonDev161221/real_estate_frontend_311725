@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Property Click Debug</title>
+    <style>
+        .property-card { 
+            border: 1px solid #ccc; 
+            padding: 10px; 
+            margin: 10px; 
+            cursor: pointer;
+            background: #f9f9f9;
+        }
+        .property-card:hover { 
+            background: #e9e9e9; 
+        }
+    </style>
+</head>
+<body>
+    <h1>Property Click Test</h1>
+    <div id="properties-container"></div>
+    <div id="debug-log"></div>
+
+    <script>
+        const API_BASE_URL = 'http://127.0.0.1:8000/api';
+        
+        function log(message) {
+            const debugLog = document.getElementById('debug-log');
+            debugLog.innerHTML += `<p>${new Date().toLocaleTimeString()}: ${message}</p>`;
+            console.log(message);
+        }
+        
+        function showPropertyDetail(propertyId) {
+            log(`✅ showPropertyDetail called with ID: ${propertyId} (type: ${typeof propertyId})`);
+            alert(`Property ID: ${propertyId}`);
+        }
+        
+        async function loadProperties() {
+            log('🔄 Loading properties...');
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/properties/`);
+                const data = await response.json();
+                
+                log(`📊 Loaded ${data.results.length} properties`);
+                
+                const container = document.getElementById('properties-container');
+                
+                container.innerHTML = data.results.map(property => `
+                    <div class="property-card" onclick="showPropertyDetail('${property.id}')">
+                        <h3>${property.title}</h3>
+                        <p>Price: $${property.price}</p>
+                        <p>ID: ${property.id}</p>
+                        <p>Type: ${typeof property.id}</p>
+                        <button onclick="event.stopPropagation(); showPropertyDetail('${property.id}')">Click me</button>
+                    </div>
+                `).join('');
+                
+                log('✅ Properties rendered');
+                
+            } catch (error) {
+                log(`❌ Error: ${error.message}`);
+            }
+        }
+        
+        // Load properties on page load
+        document.addEventListener('DOMContentLoaded', loadProperties);
+    </script>
+</body>
+</html>
